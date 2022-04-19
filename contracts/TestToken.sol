@@ -13,7 +13,7 @@ contract TestToken is IERC20WithFees, ERC20, Ownable {
     }
 
     //owner is the DAO contract
-    function setFees(uint256 _fees) public override onlyOwner {
+    function changeFee(uint256 _fees) public override onlyOwner {
         fees = _fees;
     }
 }

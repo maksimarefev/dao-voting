@@ -27,7 +27,7 @@ contract VotingDao is Ownable {
     mapping(uint256 => Proposal) private proposals;
     mapping(address => uint256) proposalCounters;
     mapping(uint256 => mapping(address => bool)) proposalsToVoters; //since the compiler does not allow us to assign structs with nested mappings :(
-    mapping(address => uint256) private stakeholdersToDeposits; //todo add view function to read the deposit
+    mapping(address => uint256) private stakeholdersToDeposits;
 
     event ProposalFinished(bool votedFor);
 
@@ -66,6 +66,12 @@ contract VotingDao is Ownable {
     }
 
     function addProposal(bytes memory data, address recipient, string memory _description) public onlyChairman {
+        uint32 codeSize;
+        assembly {
+            codeSize := extcodesize(recipient)
+        }
+        require(codeSize > 0, "Recipient is not a contract");
+
         uint256 nextProposalId = proposalIdGenerator.current();
         proposalIdGenerator.increment();
 
@@ -101,9 +107,7 @@ contract VotingDao is Ownable {
         require(proposal.recipient != address(0), "Proposal not found");
         require(block.timestamp >= proposal.deadline, "Proposal is still in progress");
 
-        if ((proposal.votesAgainst + proposal.votesAgainst) / voteToken.balanceOf(address(this)) < minimumQuorum) {
-            emit ProposalFailed("Minimum quorum is not reached");
-        } else if (proposal.votesFor > proposal.votesAgainst) {
+        if (isQuorumReached(proposal)) {
             (bool success,) = proposal.recipient.call{value : 0}(proposal.data);
 
             if (success) {
@@ -111,6 +115,8 @@ contract VotingDao is Ownable {
             } else {
                 emit ProposalFailed("Function call failed");
             }
+        } else {
+            emit ProposalFailed("Minimum quorum is not reached");
         }
 
         for (uint256 i = 0; i < proposal.voters.length; i++) {
@@ -132,5 +138,14 @@ contract VotingDao is Ownable {
     function description(uint256 proposalId) public view returns (string memory) {
         require(proposals[proposalId].recipient != address(0), "Proposal not found");
         return proposals[proposalId].description;
+    }
+
+    function deposited(address stakeholder) public view returns(uint256) {
+        return stakeholdersToDeposits[stakeholder];
+    }
+
+    //todo arefev: what if there is no supply? is that possible? yes, it is possible
+    function isQuorumReached(Proposal storage proposal) private returns (bool) {
+        return (proposal.votesFor + proposal.votesAgainst) / voteToken.balanceOf(address(this)) * 100 >= minimumQuorum;
     }
 }
