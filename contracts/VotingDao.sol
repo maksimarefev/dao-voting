@@ -1,5 +1,6 @@
 pragma solidity ^0.8.0;
 
+import "./IERC20WithFees.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -15,16 +16,18 @@ contract VotingDao is Ownable {
         uint256 votesFor;
         uint256 votesAgainst;
         uint256 deadline;
-        mapping(address => bool) voters;
+        address[] voters;
     }
 
     address public chairman;
-    IERC20 public voteToken;
+    IERC20WithFees public voteToken;
     uint256 public minimumQuorum;
     uint256 public debatingPeriodDuration;
     Counters.Counter private proposalIdGenerator;
     mapping(uint256 => Proposal) private proposals;
-    mapping(address => uint256) private stakeholdersToDeposits;
+    mapping(address => uint256) proposalCounters;
+    mapping(uint256 => mapping(address => bool)) proposalsToVoters; //since the compiler does not allow us to assign structs with nested mappings :(
+    mapping(address => uint256) private stakeholdersToDeposits; //todo add view function to read the deposit
 
     event ProposalFinished(bool votedFor);
 
@@ -41,63 +44,63 @@ contract VotingDao is Ownable {
     }
 
     constructor(address _chairman, address _voteToken, uint256 _minimumQuorum, uint256 _debatingPeriodDuration) public {
+        require(_minimumQuorum <= 100, "Minimum quorum can not exceed 100%");
         chairman = _chairman;
-        voteToken = IERC20(_voteToken);
+        voteToken = IERC20WithFees(_voteToken);
         minimumQuorum = _minimumQuorum;
         debatingPeriodDuration = _debatingPeriodDuration;
     }
 
-    //todo arefev: balanceOf?
     function deposit(uint256 amount) public {
+        require(voteToken.balanceOf(msg.sender) >= amount, "Not enough balance");
         require(voteToken.allowance(msg.sender, address(this)) >= amount, "Not enough allowance");
         require(voteToken.transferFrom(msg.sender, address(this), amount), "Transfer failed");
         stakeholdersToDeposits[msg.sender] += amount;
     }
 
-    //todo arefev: forbid withdrawing if there are corresponding proposals in place
-    //todo arefev: seems like i have no other way rather than keep an array of voted proposals for the voter
     function withdraw(uint256 amount) public onlyStakeholder {
+        require(proposalCounters[msg.sender] == 0, "Sender is participating in proposals");
         require(stakeholdersToDeposits[msg.sender] >= amount, "Amount is greater than deposited");
         require(voteToken.transfer(msg.sender, amount), "Transfer failed");
         stakeholdersToDeposits[msg.sender] -= amount;
     }
 
-    //todo arefev: what is description?
-    function addProposal(bytes memory data, address recipient, string memory description) public onlyChairman {
+    function addProposal(bytes memory data, address recipient, string memory _description) public onlyChairman {
         uint256 nextProposalId = proposalIdGenerator.current();
         proposalIdGenerator.increment();
-        proposals[nextProposalId] = Proposal({
-        data : data,
-        recipient : recipient,
-        description : description,
-        votesFor : 0,
-        votesAgainst : 0,
-        deadline : block.timestamp + debatingPeriodDuration
-        });
+
+        Proposal storage newProposal = proposals[nextProposalId];
+        newProposal.data = data;
+        newProposal.recipient = recipient;
+        newProposal.description = _description;
+        newProposal.deadline = block.timestamp + debatingPeriodDuration;
+        proposals[nextProposalId] = newProposal;
     }
 
     function vote(uint256 proposalId, bool votesFor) public onlyStakeholder {
         Proposal storage proposal = proposals[proposalId];
 
         require(proposal.recipient != address(0), "Proposal not found");
-        require(!proposal.voters[msg.sender], "Already voted");
+        require(proposal.deadline > block.timestamp, "Proposal is finished");
+        require(!proposalsToVoters[proposalId][msg.sender], "Already voted");
 
-        proposal.voters[msg.sender] = true;
+        proposalsToVoters[proposalId][msg.sender] = true;
+        proposalCounters[msg.sender] += 1;
+        proposal.voters.push(msg.sender);
 
         if (votesFor) {
-            proposal.votesFor += stakeholdersToDeposits;
+            proposal.votesFor += stakeholdersToDeposits[msg.sender];
         } else {
-            proposal.votesAgainst += stakeholdersToDeposits;
+            proposal.votesAgainst += stakeholdersToDeposits[msg.sender];
         }
     }
 
     function finishProposal(uint256 proposalId) public {
-        Proposal memory proposal = proposals[proposalId];
+        Proposal storage proposal = proposals[proposalId];
 
         require(proposal.recipient != address(0), "Proposal not found");
         require(block.timestamp >= proposal.deadline, "Proposal is still in progress");
 
-        //todo arefev: should we remember the original minimumQuorum?
         if ((proposal.votesAgainst + proposal.votesAgainst) / voteToken.balanceOf(address(this)) < minimumQuorum) {
             emit ProposalFailed("Minimum quorum is not reached");
         } else if (proposal.votesFor > proposal.votesAgainst) {
@@ -110,14 +113,24 @@ contract VotingDao is Ownable {
             }
         }
 
+        for (uint256 i = 0; i < proposal.voters.length; i++) {
+            delete proposalsToVoters[proposalId][proposal.voters[i]];
+            proposalCounters[proposal.voters[i]] -= 1;
+        }
         delete proposals[proposalId];
     }
 
     function setMinimumQuorum(uint256 _minimumQuorum) public onlyOwner {
+        require(_minimumQuorum <= 100, "Minimum quorum can not exceed 100%");
         minimumQuorum = _minimumQuorum;
     }
 
     function setDebatingPeriodDuration(uint256 _debatingPeriodDuration) public onlyOwner {
         debatingPeriodDuration = _debatingPeriodDuration;
+    }
+
+    function description(uint256 proposalId) public view returns (string memory) {
+        require(proposals[proposalId].recipient != address(0), "Proposal not found");
+        return proposals[proposalId].description;
     }
 }
