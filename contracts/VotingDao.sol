@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-//todo arefev: add docs
 contract VotingDao is Ownable {
     using Counters for Counters.Counter;
 
@@ -19,19 +18,37 @@ contract VotingDao is Ownable {
         address[] voters;
     }
 
+    /**
+     * @dev EOA responsible for proposals creation
+     */
     address public chairman;
     IERC20WithFees public voteToken;
+
+    /**
+     * @dev The minimum amount of votes needed to consider a proposal to be successful. Quorum = (votes / dao total supply) * 100.
+     */
     uint256 public minimumQuorum;
+
+    /**
+     * @dev EOA responsible for proposals creation
+     */
     uint256 public debatingPeriodDuration;
+
     Counters.Counter private proposalIdGenerator;
     mapping(uint256 => Proposal) private proposals;
-    mapping(address => uint256) proposalCounters;
-    mapping(uint256 => mapping(address => bool)) proposalsToVoters; //since the compiler does not allow us to assign structs with nested mappings :(
+    mapping(address => uint256) private proposalCounters;
+    mapping(uint256 => mapping(address => bool)) private proposalsToVoters; //since the compiler does not allow us to assign structs with nested mappings :(
     mapping(address => uint256) private stakeholdersToDeposits;
 
-    event ProposalFinished(bool votedFor);
+    /**
+     * @dev Emitted when the proposal was successfully finished
+     */
+    event ProposalFinished(uint256 indexed proposalId, string description, bool approved);
 
-    event ProposalFailed(string description);
+    /**
+     * @dev Emitted when the proposal was failed
+     */
+    event ProposalFailed(uint256 indexed proposalId, string description, string reason);
 
     modifier onlyChairman() {
         require(msg.sender == chairman, "Not a chairman");
@@ -44,13 +61,16 @@ contract VotingDao is Ownable {
     }
 
     constructor(address _chairman, address _voteToken, uint256 _minimumQuorum, uint256 _debatingPeriodDuration) public {
-        require(_minimumQuorum <= 100, "Minimum quorum can not exceed 100%");
+        require(_minimumQuorum <= 100, "Minimum quorum can not be > 100");
         chairman = _chairman;
         voteToken = IERC20WithFees(_voteToken);
         minimumQuorum = _minimumQuorum;
         debatingPeriodDuration = _debatingPeriodDuration;
     }
 
+    /**
+     * @notice transfers the `amount` of tokens from `msg.sender` to that contract
+     */
     function deposit(uint256 amount) public {
         require(voteToken.balanceOf(msg.sender) >= amount, "Not enough balance");
         require(voteToken.allowance(msg.sender, address(this)) >= amount, "Not enough allowance");
@@ -58,14 +78,21 @@ contract VotingDao is Ownable {
         stakeholdersToDeposits[msg.sender] += amount;
     }
 
+    /**
+     * @notice transfers the `amount` of tokens from that contract to `msg.sender`
+     */
     function withdraw(uint256 amount) public onlyStakeholder {
-        require(proposalCounters[msg.sender] == 0, "Sender is participating in proposals");
+        require(proposalCounters[msg.sender] == 0, "There are ongoing proposals");
         require(stakeholdersToDeposits[msg.sender] >= amount, "Amount is greater than deposited");
-        require(voteToken.transfer(msg.sender, amount), "Transfer failed");
         stakeholdersToDeposits[msg.sender] -= amount;
+        require(voteToken.transfer(msg.sender, amount), "Transfer failed");
     }
 
-    function addProposal(bytes memory data, address recipient, string memory _description) public onlyChairman {
+    /**
+     * @notice creates a new proposal
+     * @return created proposal id
+     */
+    function addProposal(bytes memory data, address recipient, string memory _description) public onlyChairman returns(uint256) {
         uint32 codeSize;
         assembly {
             codeSize := extcodesize(recipient)
@@ -81,8 +108,13 @@ contract VotingDao is Ownable {
         newProposal.description = _description;
         newProposal.deadline = block.timestamp + debatingPeriodDuration;
         proposals[nextProposalId] = newProposal;
+
+        return nextProposalId;
     }
 
+    /**
+     * @notice registers `msg.sender` vote
+     */
     function vote(uint256 proposalId, bool votesFor) public onlyStakeholder {
         Proposal storage proposal = proposals[proposalId];
 
@@ -101,22 +133,27 @@ contract VotingDao is Ownable {
         }
     }
 
+    /**
+     * @notice finishes the proposal with id `proposalId`
+     */
     function finishProposal(uint256 proposalId) public {
         Proposal storage proposal = proposals[proposalId];
 
         require(proposal.recipient != address(0), "Proposal not found");
         require(block.timestamp >= proposal.deadline, "Proposal is still in progress");
 
-        if (isQuorumReached(proposal)) {
+        if (voteToken.balanceOf(address(this)) == 0 || proposal.votesFor <= proposal.votesAgainst) {
+            emit ProposalFailed(proposalId, proposal.description, "No votes for proposal");
+        } else if ((proposal.votesFor + proposal.votesAgainst) / voteToken.balanceOf(address(this)) * 100 >= minimumQuorum) {
             (bool success,) = proposal.recipient.call{value : 0}(proposal.data);
 
             if (success) {
-                emit ProposalFinished(proposal.votesFor > proposal.votesAgainst);
+                emit ProposalFinished(proposalId, proposal.description, true);
             } else {
-                emit ProposalFailed("Function call failed");
+                emit ProposalFailed(proposalId, proposal.description, "Function call failed");
             }
         } else {
-            emit ProposalFailed("Minimum quorum is not reached");
+            emit ProposalFailed(proposalId, proposal.description, "Minimum quorum is not reached");
         }
 
         for (uint256 i = 0; i < proposal.voters.length; i++) {
@@ -127,7 +164,7 @@ contract VotingDao is Ownable {
     }
 
     function setMinimumQuorum(uint256 _minimumQuorum) public onlyOwner {
-        require(_minimumQuorum <= 100, "Minimum quorum can not exceed 100%");
+        require(_minimumQuorum <= 100, "Minimum quorum can not be > 100");
         minimumQuorum = _minimumQuorum;
     }
 
@@ -142,10 +179,5 @@ contract VotingDao is Ownable {
 
     function deposited(address stakeholder) public view returns(uint256) {
         return stakeholdersToDeposits[stakeholder];
-    }
-
-    //todo arefev: what if there is no supply? is that possible? yes, it is possible
-    function isQuorumReached(Proposal storage proposal) private returns (bool) {
-        return (proposal.votesFor + proposal.votesAgainst) / voteToken.balanceOf(address(this)) * 100 >= minimumQuorum;
     }
 }

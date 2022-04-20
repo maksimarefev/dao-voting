@@ -27,7 +27,6 @@ describe("VotingDao", function() {
    }
 
     beforeEach("Deploying contract", async function () {
-        const networkId: number = 1;
         [alice, bob] = await ethers.getSigners();
 
         erc20Mock = await smock.fake(TestToken.abi);
@@ -88,14 +87,13 @@ describe("VotingDao", function() {
             const description: string = "";
             const proposalId: number = 0;
             const votesFor: boolean = true;
-            const aliceAddress: string = await alice.getAddress();
             const targetContractAddress: string = erc20Mock.address;
 
             await dao.addProposal(data, targetContractAddress, description);
             await dao.vote(proposalId, votesFor);
             const withdrawTxPromise: Promise<any> = dao.withdraw(withdrawAmount);
 
-            await expect(withdrawTxPromise).to.be.revertedWith("Sender is participating in proposals");
+            await expect(withdrawTxPromise).to.be.revertedWith("There are ongoing proposals");
         });
 
         it("Should not allow to withdraw the amount greater than the sender holds", async function() {
@@ -260,19 +258,23 @@ describe("VotingDao", function() {
         });
 
         it("Should emit ProposalFailed if a number of votes does not exceed the minimum quorum", async function() {
+            const depositAmount: number = 1;
+            await deposit(alice, depositAmount);
             const proposalId: number = 0;
             const description: string = "";
             const data: Uint8Array = new Uint8Array();
             const targetContractAddress: string = erc20Mock.address;
             const daoBalance: number = 2;
-            const errorMessage: string = "Minimum quorum is not reached";
+            const votesFor: boolean = true;
             await erc20Mock.balanceOf.whenCalledWith(dao.address).returns(daoBalance);
 
             await dao.addProposal(data, targetContractAddress, description);
+            await dao.vote(proposalId, votesFor);
             await network.provider.send("evm_increaseTime", [debatingPeriodDuration]);
             const finishProposalTxPromise: Promise<any> = dao.finishProposal(proposalId);
 
-            await expect(finishProposalTxPromise).to.emit(dao, "ProposalFailed").withArgs(errorMessage);
+            await expect(finishProposalTxPromise).to.emit(dao, "ProposalFailed")
+                .withArgs(proposalId, description, "Minimum quorum is not reached");
         });
 
         it("Should emit ProposalFinished if a call to a target contract succeeded", async function() {
@@ -295,12 +297,11 @@ describe("VotingDao", function() {
             await network.provider.send("evm_increaseTime", [debatingPeriodDuration]);
             const finishProposalTxPromise: Promise<any> = dao.finishProposal(proposalId);
 
-            await expect(finishProposalTxPromise).to.emit(dao, "ProposalFinished").withArgs(votesFor);
+            await expect(finishProposalTxPromise).to.emit(dao, "ProposalFinished").withArgs(proposalId, description, votesFor);
             expect(erc20Mock.changeFee).to.be.calledOnceWith(newFees);
         });
 
         it("Should emit ProposalFailed if a call to a target contract did not succeed", async function() {
-            const aliceAddress: string = await alice.getAddress();
             const depositAmount: number = 2;
             await deposit(alice, depositAmount);
             const proposalId: number = 0;
@@ -318,8 +319,23 @@ describe("VotingDao", function() {
             await network.provider.send("evm_increaseTime", [debatingPeriodDuration]);
             const finishProposalTxPromise: Promise<any> = dao.finishProposal(proposalId);
 
-            await expect(finishProposalTxPromise).to.emit(dao, "ProposalFailed").withArgs("Function call failed");
+            await expect(finishProposalTxPromise).to.emit(dao, "ProposalFailed")
+                .withArgs(proposalId, description, "Function call failed");
             expect(erc20Mock.changeFee).to.be.calledOnceWith(newFees);
+        });
+
+        it("Should emit ProposalFailed if a proposal has no votes", async function() {
+            const proposalId: number = 0;
+            const description: string = "";
+            const data: Uint8Array = new Uint8Array();
+            const targetContractAddress: string = erc20Mock.address;
+
+            await dao.addProposal(data, targetContractAddress, description);
+            await network.provider.send("evm_increaseTime", [debatingPeriodDuration]);
+            const finishProposalTxPromise: Promise<any> = dao.finishProposal(proposalId);
+
+            await expect(finishProposalTxPromise).to.emit(dao, "ProposalFailed")
+                .withArgs(proposalId, description, "No votes for proposal");
         });
    });
 
@@ -366,7 +382,7 @@ describe("VotingDao", function() {
 
             const setMinimumQuorumTxPromise: Promise<any> = dao.setMinimumQuorum(minimumQuorum);
 
-            await expect(setMinimumQuorumTxPromise).to.be.revertedWith("Minimum quorum can not exceed 100%");
+            await expect(setMinimumQuorumTxPromise).to.be.revertedWith("Minimum quorum can not be > 100");
         });
 
         it("Should not return a description for a non-existing proposals", async function() {
@@ -374,7 +390,7 @@ describe("VotingDao", function() {
 
             const descriptionPromise: Promise<any>= dao.description(proposalId);
 
-            await expect(descriptionPromise).to.be.revertedWith("Minimum quorum can not exceed 100%");
+            await expect(descriptionPromise).to.be.revertedWith("Proposal not found");
         });
 
         it("Should return a valid description for an existing proposals", async function() {
@@ -398,7 +414,7 @@ describe("VotingDao", function() {
                 await alice.getAddress(), erc20Mock.address, minimumQuorum, debatingPeriodDuration
             );
 
-            await expect(deployTxPromise).to.be.revertedWith("Minimum quorum can not exceed 100%");
+            await expect(deployTxPromise).to.be.revertedWith("Minimum quorum can not be > 100");
         });
    });
 });
