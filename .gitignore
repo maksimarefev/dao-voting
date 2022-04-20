@@ -4,6 +4,7 @@ coverage
 coverage.json
 typechain-types
 .idea
+*Flattened.sol
 
 #Hardhat files
 cache

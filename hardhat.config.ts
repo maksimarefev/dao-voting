@@ -4,6 +4,11 @@ import "@typechain/hardhat";
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-waffle";
 import "@nomiclabs/hardhat-etherscan";
+import "./tasks/addProposal.ts";
+import "./tasks/deposit.ts";
+import "./tasks/finish.ts";
+import "./tasks/withdraw.ts";
+import "./tasks/vote.ts";
 import { HardhatUserConfig } from "hardhat/config";
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY;

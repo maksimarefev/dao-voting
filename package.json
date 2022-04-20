@@ -2,7 +2,6 @@
   "name": "hardhat-project",
   "dependencies": {
     "@defi-wonderland/smock": "^2.0.7",
-    "@m.arefev/nft": "^1.0.1",
     "@nomiclabs/ethereumjs-vm": "^4.2.2",
     "@nomiclabs/hardhat-ethers": "^2.0.5",
     "@nomiclabs/hardhat-etherscan": "^3.0.3",

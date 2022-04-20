@@ -29,9 +29,9 @@ async function main() {
         throw new Error('No accounts were provided');
     }
 
-    const signerAddress: string = await accounts[0].getAddress();
+    const chairman: string = await accounts[0].getAddress();
 
-    console.log("Deploying contracts with the account:", accounts[0].address);
+    console.log("Deploying contracts with the account:", chairman);
 
     console.log("Deploying ERC20 contract");
     const TestToken: TestToken__factory = (await ethers.getContractFactory("TestToken")) as TestToken__factory;
@@ -43,18 +43,18 @@ async function main() {
     const debatingPeriodDuration = 3 * 24 * 60 * 60; //3 days
     console.log("Deploying DAO contract");
     const VotingDao: VotingDao__factory = (await ethers.getContractFactory("VotingDao")) as VotingDao__factory;
-    const dao: VotingDao = await VotingDao.deploy(signerAddress, erc20.address, minimumQuorum, debatingPeriodDuration);
+    const dao: VotingDao = await VotingDao.deploy(chairman, erc20.address, minimumQuorum, debatingPeriodDuration);
     await dao.deployed();
     console.log("DAO had been deployed to:", dao.address);
 
     await erc20.transferOwnership(dao.address);
 
-    console.log("Verifying NFT contract..");
-    verify(erc20.address, networkName);
-    console.log("NFT contract is verified");
+    console.log("Verifying ERC20 contract..");
+    verify(erc20.address);
+    console.log("ERC20 contract is verified");
 
     console.log("Verifying dao contract..");
-    verify(dao.address, signerAddress, erc20.address, networkId);
+    verify(dao.address, chairman, erc20.address, minimumQuorum, debatingPeriodDuration);
     console.log("DAO contract is verified");
 }
 

@@ -14,6 +14,6 @@ task("vote", "Registers `msg.sender` vote")
         const voteTx: any = await dao.vote(taskArgs.proposalId, taskArgs.votesFor);
         const voteTxReceipt: any = await voteTx.wait();
 
-        console.log("Successfully voted `%s` on the proposal with id %d", votesFor ? "for" : "against", proposalId);
+        console.log("Successfully voted `%s` on the proposal with id %d", taskArgs.votesFor ? "for" : "against", taskArgs.proposalId);
         console.log("Gas used: %d", voteTxReceipt.gasUsed.toNumber() * voteTxReceipt.effectiveGasPrice.toNumber());
     });

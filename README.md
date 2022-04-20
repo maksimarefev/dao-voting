@@ -1,5 +1,5 @@
 ## Overview
-Crosschain bridge implementation (Ethereum <--> BSC).
+Implementation of Decentralized Autonomous Organization. Provides ability for stakeholders to vote on calling contract's function.
 
 ## Configuring a secret
 In the root folder create *.env* file and fill it the following properties:<br/>
@@ -33,41 +33,42 @@ From the root folder run ``` npx hardhat coverage ```
 ```
 VotingDao
     deposit
-      √ Should not allow to deposit on insufficient balance (61ms)
-      √ Should not allow to deposit on insufficient allowance
-      √ Should not allow to deposit on failed transfer (42ms)
+      √ Should not allow to deposit on insufficient balance (51ms)
+      √ Should not allow to deposit on insufficient allowance (38ms)
+      √ Should not allow to deposit on failed transfer
     withdraw
-      √ Should not allow to withdraw if sender is participating in proposals (139ms)
-      √ Should not allow to withdraw the amount greater than the sender holds (58ms)
+      √ Should not allow to withdraw if sender is participating in proposals (150ms)
+      √ Should not allow to withdraw the amount greater than the sender holds (57ms)
       √ Should not allow for a non-stakeholder to withdraw
-      √ Should not allow to withdraw on failed transfer (79ms)
-      √ Should allow to withdraw tokens if any (86ms)
+      √ Should not allow to withdraw on failed transfer (65ms)
+      √ Should allow to withdraw tokens if any (84ms)
     vote
-      √ Should not allow to vote if there is no proposal (65ms)
-      √ Should not allow to vote if the proposal has met deadline (94ms)
-      √ Should not allow to vote if sender already voted (162ms)
+      √ Should not allow to vote if there is no proposal (63ms)
+      √ Should not allow to vote if the proposal has met deadline (92ms)
+      √ Should not allow to vote if sender already voted (122ms)
     addProposal
-      √ Should allow for chairman to create proposal (71ms)
+      √ Should allow for chairman to create proposal (56ms)
       √ Should not allow for non-chairman to create proposal
       √ Should not allow to create a proposal if recepient is not a contract
     finishProposal
       √ Should not allow to finish non-existing proposal
-      √ Should not allow to finish in-progress proposal (53ms)
-      √ Should emit ProposalFailed if a number of votes does not exceed the minimum quorum (156ms)
-      √ Should emit ProposalFinished if a call to a target contract succeeded (235ms)
-      √ Should emit ProposalFailed if a call to a target contract did not succeed (222ms)
-      √ Should emit ProposalFailed if a proposal has no votes (110ms)
+      √ Should not allow to finish in-progress proposal (171ms)
+      √ Should emit ProposalFailed if a number of votes does not exceed the minimum quorum (126ms)
+      √ Should emit ProposalFinished if a call to a target contract succeeded (173ms)
+      √ Should emit ProposalFailed if a call to a target contract did not succeed (127ms)
+      √ Should emit ProposalFailed if a proposal has no votes (62ms)
+      √ Should emit ProposalFinished if number of `against` votes exceeds a number of `for` votes (159ms)
     misc
       √ Should not allow for non-owner to change debating period duration
-      √ Should allow for the owner to change debating period duration (86ms)
-      √ Should not allow for non-owner to change minimum quorum (42ms)
-      √ Should allow for the owner to change minimum quorum (71ms)
+      √ Should allow for the owner to change debating period duration
+      √ Should not allow for non-owner to change minimum quorum
+      √ Should allow for the owner to change minimum quorum
       √ Should not allow to set a minimum quorum greater than 100
       √ Should not return a description for a non-existing proposals
-      √ Should return a valid description for an existing proposals (71ms)
-      √ Should not allow to construct dao contract with invalid minimum quorum (42ms)
+      √ Should return a valid description for an existing proposals
+      √ Should not allow to construct dao contract with invalid minimum quorum (44ms)
 
-  28 passing (6s)
+  29 passing (5s)
 ```
 | File             | % Stmts    | % Branch   | % Funcs    | % Lines    | Uncovered Lines  |
 |------------------|------------|------------|------------|------------|------------------|
@@ -79,7 +80,6 @@ VotingDao
 
 ## Project dependencies
 * @defi-wonderland/smock#2.0.7
-* @m.arefev/nft#1.0.1
 * @nomiclabs/ethereumjs-vm#4.2.2
 * @nomiclabs/hardhat-ethers#2.0.5
 * @nomiclabs/hardhat-etherscan#3.0.3
@@ -88,11 +88,11 @@ VotingDao
 * @openzeppelin/contracts#4.5.0
 * @typechain/ethers-v5#10.0.0
 * @typechain/hardhat#6.0.0
-* @types/chai#4.3.0
+* @types/chai#4.3.1
 * @types/mocha#9.1.0
-* @types/node#17.0.23
-* @typescript-eslint/eslint-plugin#5.18.0
-* @typescript-eslint/parser#5.18.0
+* @types/node#17.0.25
+* @typescript-eslint/eslint-plugin#5.20.0
+* @typescript-eslint/parser#5.20.0
 * chai#4.3.6
 * dotenv#16.0.0
 * eslint#8.13.0
@@ -102,4 +102,4 @@ VotingDao
 * solidity-coverage#0.7.20
 * ts-node#10.7.0
 * typechain#8.0.0
-* typescript#4.6.3
+* typescript#4.6.

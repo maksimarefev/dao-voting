@@ -13,6 +13,6 @@ task("finish", "Finishes the proposal with id `proposalId`")
         const finishTx: any = await dao.finish(taskArgs.proposalId);
         const finishTxReceipt: any = await finishTx.wait();
 
-        console.log("Successfully finished the proposal with id %d", proposalId);
+        console.log("Successfully finished the proposal with id %d", taskArgs.proposalId);
         console.log("Gas used: %d", finishTxReceipt.gasUsed.toNumber() * finishTxReceipt.effectiveGasPrice.toNumber());
     });

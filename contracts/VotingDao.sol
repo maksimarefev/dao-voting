@@ -21,7 +21,7 @@ contract VotingDao is Ownable {
     /**
      * @dev EOA responsible for proposals creation
      */
-    address public chairman;
+    address public chairman; //todo arefev: add possibility to change chairman
     IERC20WithFees public voteToken;
 
     /**
@@ -142,15 +142,19 @@ contract VotingDao is Ownable {
         require(proposal.recipient != address(0), "Proposal not found");
         require(block.timestamp >= proposal.deadline, "Proposal is still in progress");
 
-        if (voteToken.balanceOf(address(this)) == 0 || proposal.votesFor <= proposal.votesAgainst) {
+        if (proposal.votesFor == 0 && proposal.votesAgainst == 0) {
             emit ProposalFailed(proposalId, proposal.description, "No votes for proposal");
-        } else if ((proposal.votesFor + proposal.votesAgainst) / voteToken.balanceOf(address(this)) * 100 >= minimumQuorum) {
-            (bool success,) = proposal.recipient.call{value : 0}(proposal.data);
+        } else if ((proposal.votesFor + proposal.votesAgainst) * 100 / voteToken.balanceOf(address(this)) >= minimumQuorum) {
+            if (proposal.votesFor > proposal.votesAgainst) {
+                (bool success,) = proposal.recipient.call{value : 0}(proposal.data);
 
-            if (success) {
-                emit ProposalFinished(proposalId, proposal.description, true);
+                if (success) {
+                    emit ProposalFinished(proposalId, proposal.description, true);
+                } else {
+                    emit ProposalFailed(proposalId, proposal.description, "Function call failed");
+                }
             } else {
-                emit ProposalFailed(proposalId, proposal.description, "Function call failed");
+                emit ProposalFinished(proposalId, proposal.description, false);
             }
         } else {
             emit ProposalFailed(proposalId, proposal.description, "Minimum quorum is not reached");

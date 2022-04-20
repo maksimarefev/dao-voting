@@ -235,7 +235,7 @@ describe("VotingDao", function() {
           "stateMutability": "nonpayable",
           "type": "function"
         }];
-        const iface = new ethers.utils.Interface(changeFeeAbi); //todo arefev: rename
+        const iface = new ethers.utils.Interface(changeFeeAbi);
 
         it("Should not allow to finish non-existing proposal", async function() {
             const proposalId: number = 0;
@@ -264,7 +264,7 @@ describe("VotingDao", function() {
             const description: string = "";
             const data: Uint8Array = new Uint8Array();
             const targetContractAddress: string = erc20Mock.address;
-            const daoBalance: number = 2;
+            const daoBalance: number = 5;
             const votesFor: boolean = true;
             await erc20Mock.balanceOf.whenCalledWith(dao.address).returns(daoBalance);
 
@@ -336,6 +336,29 @@ describe("VotingDao", function() {
 
             await expect(finishProposalTxPromise).to.emit(dao, "ProposalFailed")
                 .withArgs(proposalId, description, "No votes for proposal");
+        });
+
+        it("Should emit ProposalFinished if number of `against` votes exceeds a number of `for` votes", async function() {
+            const aliceDepositAmount: number = 1;
+            const bobDepositAmount: number = 2;
+            await deposit(alice, aliceDepositAmount);
+            await deposit(bob, bobDepositAmount);
+            const proposalId: number = 0;
+            const description: string = "";
+            const data: Uint8Array = new Uint8Array();
+            const targetContractAddress: string = erc20Mock.address;
+            const daoBalance: number = aliceDepositAmount + bobDepositAmount;
+            const votesFor: boolean = true;
+            await erc20Mock.balanceOf.whenCalledWith(dao.address).returns(daoBalance);
+
+            await dao.addProposal(data, targetContractAddress, description);
+            await dao.vote(proposalId, votesFor);
+            await dao.connect(bob).vote(proposalId, !votesFor);
+            await network.provider.send("evm_increaseTime", [debatingPeriodDuration]);
+            const finishProposalTxPromise: Promise<any> = dao.finishProposal(proposalId);
+
+            await expect(finishProposalTxPromise).to.emit(dao, "ProposalFinished")
+                .withArgs(proposalId, description, !votesFor);
         });
    });
 
