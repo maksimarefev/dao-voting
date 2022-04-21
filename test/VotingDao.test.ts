@@ -219,6 +219,17 @@ describe("VotingDao", function() {
 
             await expect(addProposalTxPromise).to.be.revertedWith("Recipient is not a contract");
         });
+
+        it("Should emit ProposalCreated event", async function() {
+            const proposalId: number = 0;
+            const description: string = "description";
+            const data: Uint8Array = new Uint8Array();
+            const targetContractAddress: string = erc20Mock.address;
+
+            const addProposaltxPromise: Promise<any> = dao.addProposal(data, targetContractAddress, description);
+
+            await expect(addProposaltxPromise).to.emit(dao, "ProposalCreated").withArgs(proposalId);
+        });
    });
 
    describe("finishProposal", async function() {
@@ -438,6 +449,31 @@ describe("VotingDao", function() {
             );
 
             await expect(deployTxPromise).to.be.revertedWith("Minimum quorum can not be > 100");
+        });
+   });
+
+   describe("changeChairman", async function() {
+        it("Should not allow for non-chairman to change the chairman", async function() {
+            const aliceAddress: string = await alice.getAddress();
+
+            const changeChairmanTxPromise: Promise<any> = dao.connect(bob).changeChairman(aliceAddress);
+
+            await expect(changeChairmanTxPromise).to.be.revertedWith("Not a chairman");
+        });
+
+        it("Should allow for chairman to change the chairman", async function() {
+            const bobAddress: string = await bob.getAddress();
+
+            await dao.changeChairman(bobAddress);
+            const theChairman: string = await dao.chairman();
+
+            expect(bobAddress).to.equal(theChairman);
+        });
+
+        it("Should not allow to assign zero address as the chairman", async function() {
+            const changeChairmanTxPromise: Promise<any> = dao.changeChairman(ethers.constants.AddressZero);
+
+            await expect(changeChairmanTxPromise).to.be.revertedWith("Should not be zero address");
         });
    });
 });

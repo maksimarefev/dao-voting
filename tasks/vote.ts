@@ -6,7 +6,7 @@ import { Contract, ContractFactory } from "ethers";
 task("vote", "Registers `msg.sender` vote")
     .addParam("contractAddress", "The address of the dao contract")
     .addParam("proposalId", "Proposal id")
-    .addParam("votesFor", "Flag which specifies whether a sender votes `for` or `agains`")
+    .addParam("votesFor", "Flag which specifies whether a sender votes `for` or `against`")
     .setAction(async function (taskArgs, hre) {
         const VotingDao: ContractFactory = await hre.ethers.getContractFactory("VotingDao");
         const dao: Contract = await VotingDao.attach(taskArgs.contractAddress);

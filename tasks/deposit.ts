@@ -12,7 +12,7 @@ task("deposit", "Transfers the `amount` of tokens from `msg.sender` to that cont
         const dao: Contract = await VotingDao.attach(taskArgs.contractAddress);
         const accounts: SignerWithAddress[] = await hre.ethers.getSigners();
 
-        const depositTx: any = await dao.depost(taskArgs.amount);
+        const depositTx: any = await dao.deposit(taskArgs.amount);
         const depositTxReceipt: any = await depositTx.wait();
 
         console.log(

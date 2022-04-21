@@ -21,7 +21,7 @@ contract VotingDao is Ownable {
     /**
      * @dev EOA responsible for proposals creation
      */
-    address public chairman; //todo arefev: add possibility to change chairman
+    address public chairman;
     IERC20WithFees public voteToken;
 
     /**
@@ -41,14 +41,19 @@ contract VotingDao is Ownable {
     mapping(address => uint256) private stakeholdersToDeposits;
 
     /**
-     * @dev Emitted when the proposal was successfully finished
+     * @dev Emitted when a proposal was successfully finished
      */
     event ProposalFinished(uint256 indexed proposalId, string description, bool approved);
 
     /**
-     * @dev Emitted when the proposal was failed
+     * @dev Emitted when a proposal was failed
      */
     event ProposalFailed(uint256 indexed proposalId, string description, string reason);
+
+    /**
+     * @dev Emitted when a proposal was created
+     */
+    event ProposalCreated(uint256 proposalId);
 
     modifier onlyChairman() {
         require(msg.sender == chairman, "Not a chairman");
@@ -90,9 +95,8 @@ contract VotingDao is Ownable {
 
     /**
      * @notice creates a new proposal
-     * @return created proposal id
      */
-    function addProposal(bytes memory data, address recipient, string memory _description) public onlyChairman returns(uint256) {
+    function addProposal(bytes memory data, address recipient, string memory _description) public onlyChairman {
         uint32 codeSize;
         assembly {
             codeSize := extcodesize(recipient)
@@ -109,7 +113,7 @@ contract VotingDao is Ownable {
         newProposal.deadline = block.timestamp + debatingPeriodDuration;
         proposals[nextProposalId] = newProposal;
 
-        return nextProposalId;
+        emit ProposalCreated(nextProposalId);
     }
 
     /**
@@ -167,20 +171,40 @@ contract VotingDao is Ownable {
         delete proposals[proposalId];
     }
 
+    /**
+     * @notice Transfers chairman grants to a `_chairman`
+     */
+    function changeChairman(address _chairman) public onlyChairman {
+        require(_chairman != address(0), "Should not be zero address");
+        chairman = _chairman;
+    }
+
+    /**
+     * @notice Sets the minimum quorum
+     */
     function setMinimumQuorum(uint256 _minimumQuorum) public onlyOwner {
         require(_minimumQuorum <= 100, "Minimum quorum can not be > 100");
         minimumQuorum = _minimumQuorum;
     }
 
+    /**
+     * @notice Sets the debating period duration
+     */
     function setDebatingPeriodDuration(uint256 _debatingPeriodDuration) public onlyOwner {
         debatingPeriodDuration = _debatingPeriodDuration;
     }
 
+    /**
+     * @return A description of a proposal with the id `proposalId`
+     */
     function description(uint256 proposalId) public view returns (string memory) {
         require(proposals[proposalId].recipient != address(0), "Proposal not found");
         return proposals[proposalId].description;
     }
 
+    /**
+     * @notice An amount of deposited tokens for the `stakeholder`
+     */
     function deposited(address stakeholder) public view returns(uint256) {
         return stakeholdersToDeposits[stakeholder];
     }

@@ -15,11 +15,8 @@ task("addProposal", "Creates a new proposal")
         const addProposalTx: any = await dao.addProposal(taskArgs.data, taskArgs.recipient, taskArgs.description);
         const addProposalTxReceipt: any = await addProposalTx.wait();
 
-
         console.log(
-            "Successfully created new proposal with id %d",
-            //todo arefev: extract the return value
+            "Successfully created new proposal with id %d", addProposalTxReceipt.events[0].args.proposalId.toNumber()
         );
-
         console.log("Gas used: %d", addProposalTxReceipt.gasUsed.toNumber() * addProposalTxReceipt.effectiveGasPrice.toNumber());
     });
